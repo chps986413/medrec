@@ -1,11 +1,12 @@
+# app.py
 import streamlit as st
 from datetime import date, datetime, time
 import matplotlib.pyplot as plt
-import db  # 匯入剛剛的 db.py
+import db  # 匯入 db.py
 
 st.title("🗓️ 用藥時間軸記錄")
 
-# 側邊欄：管理藥物清單
+# 側邊欄：藥物管理
 with st.sidebar:
     st.header("藥物管理")
     new_med = st.text_input("新增藥物名稱")
@@ -13,7 +14,6 @@ with st.sidebar:
         if new_med.strip():
             db.add_med(new_med.strip())
             st.success(f"已新增 {new_med.strip()}")
-            st.experimental_rerun()
 
     meds = db.get_meds()
     if meds:
@@ -21,7 +21,6 @@ with st.sidebar:
         if st.button("刪除藥物"):
             db.remove_med(to_del)
             st.success(f"已刪除 {to_del}")
-            
     else:
         st.info("尚無任何藥物，請先新增。")
 
@@ -42,23 +41,22 @@ if meds:
         dosage = st.text_input("劑量", "100mg")
 
     if st.button("確定新增"):
-        # 合併日期與時間
         dt = datetime.combine(sel_date, sel_time)
         db.add_entry(sel_med, dt.isoformat(), dosage)
         st.success(f"已為 {sel_med} 新增記錄 ({dt.strftime('%Y-%m-%d %H:%M')}, {dosage})")
+else:
+    st.info("請先新增藥物。")
 
-# 主畫面：繪製時間軸
+# 主畫面：用藥時間軸
 st.subheader("📊 用藥時間軸")
-df = db.get_all_entries_df()
-if df.empty:
+_df = db.get_all_entries_df()
+if _df.empty:
     st.warning("目前沒有任何服藥記錄。")
 else:
-    meds_unique = df['name'].unique().tolist()
-    fig, ax = plt.subplots(
-        figsize=(10, max(2, len(meds_unique)*0.5))
-    )
+    meds_unique = _df['name'].unique().tolist()
+    fig, ax = plt.subplots(figsize=(10, max(2, len(meds_unique)*0.5)))
     for i, med in enumerate(meds_unique):
-        sub = df[df['name']==med]
+        sub = _df[_df['name']==med]
         ax.scatter(sub['date'], [i]*len(sub), label=med)
     ax.set_yticks(range(len(meds_unique)))
     ax.set_yticklabels(meds_unique)
@@ -66,50 +64,18 @@ else:
     ax.grid(axis='x')
     st.pyplot(fig)
 
-# db.py
-
-import sqlite3
-from pathlib import Path
-
-DB_PATH = Path.home() / "Google Drive" / "medrec" / "med_records.db"
-DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-def get_conn():
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
-
-# 其餘函式（init_db, add_med, remove_med, add_entry）不變...
-
-def get_all_entries_df():
-    import pandas as pd
-    conn = get_conn()
-    df = pd.read_sql_query(
-        """
-        SELECT
-          e.id     AS id,
-          e.date   AS date,
-          e.dosage AS dosage,
-          m.name   AS name
-        FROM entries e
-        JOIN meds m ON e.med_id = m.id
-        ORDER BY date
-        """,
-        conn
-    )
-    conn.close()
-
-    if not df.empty:
-        # 先強制 parse，parse 失敗會變成 NaT
-        df['date_parsed'] = pd.to_datetime(df['date'], errors='coerce')
-        # 檢查哪幾筆解析失敗
-        bad = df[df['date_parsed'].isna()]
-        if not bad.empty:
-            # 列出無法解析的原始字串，讓你知道是哪幾筆有問題
-            print("Unparseable dates:", bad['date'].tolist())
-            # 你也可以選擇丟錯誤或直接剔除：
-            # raise ValueError(f"Unparseable dates: {bad['date'].tolist()}")
-            df = df[df['date_parsed'].notna()]
-        # 把解析過的欄位取代原本的 date
-        df['date'] = df['date_parsed']
-        df = df.drop(columns=['date_parsed'])
-    return df
-
+# 管理現有紀錄
+st.subheader("🗂️ 管理現有紀錄")
+_df2 = db.get_all_entries_df()
+if _df2.empty:
+    st.info("目前沒有任何記錄。")
+else:
+    for idx, row in _df2.iterrows():
+        entry_id = row['id']
+        date_str = row['date'].strftime("%Y-%m-%d %H:%M")
+        st.write(f"**{row['name']}** — {date_str} — {row['dosage']}", key=idx)
+        c1, c2 = st.columns([1,1])
+        if c1.button("刪除", key=f"del-{entry_id}"):
+            db.delete_entry(entry_id)
+        if c2.button("編輯", key=f"edit-{entry_id}"):
+            pass
