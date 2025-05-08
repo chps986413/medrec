@@ -82,7 +82,6 @@ def get_conn():
 def get_all_entries_df():
     import pandas as pd
     conn = get_conn()
-    # 將 e.id 撈出並命名為 id，還有 date, dosage, name
     df = pd.read_sql_query(
         """
         SELECT
@@ -99,7 +98,18 @@ def get_all_entries_df():
     conn.close()
 
     if not df.empty:
-        # 轉成真正的 datetime
-        df['date'] = pd.to_datetime(df['date'])
+        # 先強制 parse，parse 失敗會變成 NaT
+        df['date_parsed'] = pd.to_datetime(df['date'], errors='coerce')
+        # 檢查哪幾筆解析失敗
+        bad = df[df['date_parsed'].isna()]
+        if not bad.empty:
+            # 列出無法解析的原始字串，讓你知道是哪幾筆有問題
+            print("Unparseable dates:", bad['date'].tolist())
+            # 你也可以選擇丟錯誤或直接剔除：
+            # raise ValueError(f"Unparseable dates: {bad['date'].tolist()}")
+            df = df[df['date_parsed'].notna()]
+        # 把解析過的欄位取代原本的 date
+        df['date'] = df['date_parsed']
+        df = df.drop(columns=['date_parsed'])
     return df
 
