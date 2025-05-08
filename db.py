@@ -68,3 +68,15 @@ def get_all_entries_df():
 
 # 啟動時自動建立資料庫與表格
 init_db()
+
+# db.py（補充）
+def delete_entry(entry_id):
+    conn = get_conn(); c = conn.cursor()
+    c.execute("DELETE FROM entries WHERE id=?", (entry_id,))
+    conn.commit(); conn.close()
+
+def update_entry(entry_id, new_dt_iso, new_dosage):
+    conn = get_conn(); c = conn.cursor()
+    c.execute("UPDATE entries SET date=?, dosage=? WHERE id=?",
+              (new_dt_iso, new_dosage, entry_id))
+    conn.commit(); conn.close()
