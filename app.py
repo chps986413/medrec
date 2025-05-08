@@ -21,7 +21,7 @@ with st.sidebar:
         if st.button("刪除藥物"):
             db.remove_med(to_del)
             st.success(f"已刪除 {to_del}")
-            st.experimental_rerun()
+            
     else:
         st.info("尚無任何藥物，請先新增。")
 
@@ -40,7 +40,7 @@ if meds:
     if st.button("確定新增"):
         db.add_entry(sel_med, take_day.isoformat(), dosage)
         st.success(f"已為 {sel_med} 新增記錄 ({take_day}, {dosage})")
-        st.experimental_rerun()
+        
 else:
     st.info("請先在側邊欄新增藥物。")
 
